@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+
+  test:
+    name: Test (Java ${{ matrix.java-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        java-version: [ '17', '21' ]
+
+    steps:
+    - name: checkout
+      uses: actions/checkout@v5
+
+    - name: Setup Java ${{ matrix.java-version }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ matrix.java-version }}
+        distribution: 'temurin'
+
+    - name: mvn test
+      run: mvn -B test
+
+  trivy-scan:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: checkout
+      uses: actions/checkout@v5
+
+    - name: trivy FS mode
+      uses: aquasecurity/trivy-action@0.33.1
+      with:
+        scan-type: "fs"
+        severity: "HIGH,CRITICAL"
+        format: "sarif"
+        output: "results.sarif"
+
+    - name: upload
+      uses: github/codeql-action/upload-sarif@v4
+      with:
+        sarif_file: results.sarif
